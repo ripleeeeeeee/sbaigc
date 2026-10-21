@@ -1,0 +1,1230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>实验室"作死"模拟器</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>☢</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0a0a;
+  --yellow:#FFCC00;
+  --red:#FF3333;
+  --cyan:#00E5FF;
+  --green:#4ade80;
+  --purple:#B388FF;
+  --dim:#8a8a8a;
+  --panel:#111214;
+  --border:#2a2a2e;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  background:var(--bg);
+  color:#e8e8e8;
+  font-family:"Consolas","Courier New","Microsoft YaHei",monospace;
+  overflow-x:hidden;
+}
+.ps{font-family:"Press Start 2P","Microsoft YaHei","PingFang SC",monospace;font-size:11px;letter-spacing:1px;}
+button{font-family:inherit;cursor:pointer;}
+button:focus-visible{outline:2px dashed var(--yellow);}
+
+.screen{display:none;min-height:100vh;}
+.screen.active{display:block;}
+.scanlines{
+  position:fixed;inset:0;pointer-events:none;z-index:999;
+  background:repeating-linear-gradient(0deg,rgba(255,255,255,0.025) 0 1px,transparent 1px 3px);
+  mix-blend-mode:overlay;
+}
+.crt-vignette{
+  position:fixed;inset:0;pointer-events:none;z-index:998;
+  background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,0.55) 100%);
+}
+.hidden{display:none !important;}
+
+/* ============ 首页（终端风） ============ */
+#screen-home{
+  background:
+    radial-gradient(circle at 50% 25%,rgba(255,204,0,0.06),transparent 55%),
+    radial-gradient(circle at 85% 80%,rgba(255,51,51,0.05),transparent 45%),
+    linear-gradient(rgba(255,204,0,0.035) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,204,0,0.035) 1px,transparent 1px),
+    var(--bg);
+  background-size:auto,auto,44px 44px,44px 44px;
+  animation:gridBreathe 6s ease-in-out infinite;
+}
+@keyframes gridBreathe{
+  0%,100%{background-color:var(--bg);}
+  50%{background-color:#0c0c0e;}
+}
+.home-wrap{max-width:1080px;margin:0 auto;padding:20px 28px 40px;}
+
+.home-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;padding:8px 0 6px;border-bottom:1px solid var(--border);}
+.home-logo{color:var(--dim);font-size:13px;letter-spacing:2px;}
+.home-logo b{color:var(--yellow);}
+.home-right{display:flex;align-items:center;gap:18px;}
+.hp-display{display:flex;flex-direction:column;gap:5px;align-items:flex-end;}
+.hp-num{font-size:15px;color:var(--green);text-shadow:0 0 8px rgba(74,222,128,0.6);}
+.hp-num.low{color:var(--red);text-shadow:0 0 8px rgba(255,51,51,0.6);}
+.hp-num.mid{color:var(--yellow);text-shadow:0 0 8px rgba(255,204,0,0.6);}
+.hp-bar{display:flex;gap:2px;}
+.hp-seg{width:9px;height:13px;background:#2a2a2e;border:1px solid #3a3a40;}
+.hp-seg.on{background:var(--green);border-color:var(--green);box-shadow:0 0 4px rgba(74,222,128,0.5);}
+.hp-seg.on.mid{background:var(--yellow);border-color:var(--yellow);box-shadow:0 0 4px rgba(255,204,0,0.5);}
+.hp-seg.on.low{background:var(--red);border-color:var(--red);box-shadow:0 0 4px rgba(255,51,51,0.5);}
+.btn-reg{
+  background:transparent;border:1px solid var(--yellow);color:var(--yellow);
+  padding:7px 12px;font-size:13px;letter-spacing:1px;
+  transition:all .15s;
+}
+.btn-reg:hover{background:var(--yellow);color:#000;box-shadow:0 0 14px rgba(255,204,0,0.5);}
+
+.title-area{text-align:center;padding:52px 0 26px;position:relative;}
+.title-main{
+  font-size:clamp(30px,6vw,58px);font-weight:700;color:#fff;letter-spacing:4px;
+  text-shadow:0 0 18px rgba(255,255,255,0.25);
+}
+.glitch{position:relative;display:inline-block;}
+.glitch::before,.glitch::after{
+  content:attr(data-text);position:absolute;left:0;top:0;width:100%;height:100%;
+  background:transparent;overflow:hidden;
+}
+.glitch::before{
+  color:var(--cyan);
+  animation:glitchTop 2.7s infinite steps(2,end);
+  clip-path:inset(0 0 62% 0);
+}
+.glitch::after{
+  color:var(--red);
+  animation:glitchBot 3.1s infinite steps(2,end);
+  clip-path:inset(62% 0 0 0);
+}
+@keyframes glitchTop{
+  0%,86%,100%{transform:translate(0,0);opacity:0;}
+  88%{transform:translate(-6px,-3px);opacity:.85;}
+  92%{transform:translate(5px,2px);opacity:.7;}
+  96%{transform:translate(-3px,1px);opacity:.8;}
+}
+@keyframes glitchBot{
+  0%,82%,100%{transform:translate(0,0);opacity:0;}
+  84%{transform:translate(6px,3px);opacity:.85;}
+  90%{transform:translate(-5px,-2px);opacity:.7;}
+  95%{transform:translate(3px,-1px);opacity:.8;}
+}
+.title-sub{color:var(--dim);margin-top:14px;font-size:14px;letter-spacing:6px;}
+.title-sub .blink{animation:blink 1s steps(1) infinite;}
+@keyframes blink{50%{opacity:0;}}
+
+.steps{display:flex;justify-content:center;gap:26px;flex-wrap:wrap;padding:6px 0 30px;}
+.step{display:flex;align-items:center;gap:10px;color:#cfcfcf;font-size:14px;}
+.step-icon{
+  width:38px;height:38px;display:flex;align-items:center;justify-content:center;
+  border:2px solid var(--yellow);color:var(--yellow);font-weight:700;font-size:17px;
+  box-shadow:inset 0 0 0 2px #000,0 0 10px rgba(255,204,0,0.18);
+  image-rendering:pixelated;
+}
+.step:nth-child(2) .step-icon{border-color:var(--cyan);color:var(--cyan);box-shadow:inset 0 0 0 2px #000,0 0 10px rgba(0,229,255,0.18);}
+.step:nth-child(3) .step-icon{border-color:var(--red);color:var(--red);box-shadow:inset 0 0 0 2px #000,0 0 10px rgba(255,51,51,0.18);}
+
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;padding:8px 0 30px;}
+@media (max-width:900px){.cards{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:520px){.cards{grid-template-columns:1fr;}}
+.lab-card{
+  position:relative;background:linear-gradient(180deg,#141518,#0d0e11);
+  border:1px solid var(--border);padding:20px 16px 58px;min-height:190px;
+  transition:all .18s ease;overflow:hidden;
+}
+.lab-card::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(0,0,0,0.25) 3px 4px);
+}
+.lab-card:hover{
+  transform:translateY(-5px);
+  border-color:var(--cc,#FFCC00);
+  box-shadow:0 0 22px rgba(255,204,0,0.28),inset 0 0 30px rgba(255,204,0,0.05);
+}
+.lab-card[data-cc="#00E5FF"]:hover{box-shadow:0 0 22px rgba(0,229,255,0.28),inset 0 0 30px rgba(0,229,255,0.05);}
+.lab-card[data-cc="#4ade80"]:hover{box-shadow:0 0 22px rgba(74,222,128,0.28),inset 0 0 30px rgba(74,222,128,0.05);}
+.lab-card[data-cc="#B388FF"]:hover{box-shadow:0 0 22px rgba(179,136,255,0.28),inset 0 0 30px rgba(179,136,255,0.05);}
+.lab-card[data-cc="#FF3333"]:hover{box-shadow:0 0 22px rgba(255,51,51,0.32),inset 0 0 30px rgba(255,51,51,0.06);}
+.lab-card-head{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.lab-icon{
+  width:40px;height:40px;display:flex;align-items:center;justify-content:center;
+  font-size:20px;font-weight:700;border:2px solid;flex-shrink:0;
+  image-rendering:pixelated;
+}
+.lab-name{font-size:17px;font-weight:700;letter-spacing:1px;}
+.lab-desc{color:var(--dim);font-size:13px;line-height:1.7;}
+.lab-badge{
+  position:absolute;top:10px;right:10px;font-size:11px;color:#000;background:var(--green);
+  padding:2px 7px;border:1px solid #000;box-shadow:2px 2px 0 #000;
+}
+.btn-enter{
+  position:absolute;right:14px;bottom:14px;
+  background:transparent;border:1px solid var(--cc,#FFCC00);color:var(--cc,#FFCC00);
+  padding:8px 14px;font-size:14px;letter-spacing:2px;
+  box-shadow:3px 3px 0 rgba(0,0,0,0.9);
+  transition:all .12s;
+}
+.btn-enter:hover{background:var(--cc,#FFCC00);color:#000;box-shadow:0 0 16px var(--cc,#FFCC00);}
+.btn-enter:active{transform:translate(2px,2px);box-shadow:1px 1px 0 #000;}
+.lab-card.locked{
+  border-style:dashed;filter:grayscale(1);opacity:.55;
+}
+.lab-card.locked:hover{transform:none;box-shadow:none;border-color:var(--border);}
+.lock-note{color:var(--dim);font-size:12px;line-height:1.8;}
+.lab-card.reveal{animation:revealCard .8s ease;}
+@keyframes revealCard{
+  0%{opacity:0;transform:scale(.85);filter:blur(6px);}
+  60%{opacity:1;transform:scale(1.04);}
+  100%{opacity:1;transform:scale(1);filter:blur(0);}
+}
+
+.home-bottom{display:flex;gap:24px;align-items:stretch;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:22px;}
+.board-box{flex:1 1 380px;min-width:280px;}
+.disclaimer-box{flex:1 1 300px;min-width:260px;display:flex;flex-direction:column;justify-content:center;}
+.box-title{color:var(--red);font-size:14px;letter-spacing:3px;margin-bottom:12px;text-shadow:0 0 8px rgba(255,51,51,0.4);}
+.board-list{list-style:none;}
+.board-list li{
+  display:flex;align-items:baseline;gap:8px;padding:5px 2px;font-size:13px;color:#c9c9c9;
+  border-bottom:1px dashed #1e1e22;
+}
+.board-rank{color:var(--yellow);flex-shrink:0;min-width:44px;}
+.board-list li.new .board-rank{color:var(--red);}
+.board-list li.new .board-name{color:var(--red);}
+.board-list li.new{animation:blink 1.2s steps(1) infinite;}
+.disclaimer-box p{color:var(--dim);font-size:13px;line-height:1.9;}
+.disclaimer-box p b{color:var(--yellow);}
+.btn-clear{
+  margin-top:14px;align-self:flex-start;background:transparent;border:1px solid #3a3a40;
+  color:var(--dim);font-size:12px;padding:5px 10px;
+}
+.btn-clear:hover{color:var(--red);border-color:var(--red);}
+
+/* ============ 启动终端 ============ */
+#screen-boot{
+  display:none;align-items:center;justify-content:center;
+  background:var(--bg);
+}
+#screen-boot.active{display:flex;}
+.boot-box{
+  width:min(620px,92vw);border:1px solid var(--border);background:#0b0c0e;
+  padding:26px 26px 30px;box-shadow:0 0 40px rgba(0,0,0,0.8);
+}
+.boot-line{font-size:14px;line-height:2;color:#9adf9a;min-height:1.4em;white-space:pre-wrap;}
+.boot-line.dim{color:var(--dim);}
+.boot-prompt{margin-top:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.boot-prompt label{color:var(--yellow);font-size:14px;}
+.boot-input{
+  flex:1;min-width:180px;background:#000;border:1px solid #3a3a40;color:#fff;
+  font-family:inherit;font-size:15px;padding:8px 10px;
+}
+.boot-input:focus{outline:none;border-color:var(--yellow);box-shadow:0 0 10px rgba(255,204,0,0.3);}
+.boot-btn{
+  background:var(--yellow);color:#000;border:none;padding:9px 18px;font-size:14px;
+  letter-spacing:2px;font-weight:700;box-shadow:3px 3px 0 #000;
+}
+.boot-btn:active{transform:translate(2px,2px);box-shadow:1px 1px 0 #000;}
+.cursor{display:inline-block;width:9px;height:16px;background:var(--green);animation:blink .9s steps(1) infinite;vertical-align:middle;}
+
+/* ============ 二级场景（8bit 像素 RPG） ============ */
+#screen-game{
+  background:
+    radial-gradient(circle at 50% 20%,rgba(0,229,255,0.05),transparent 60%),
+    linear-gradient(rgba(255,255,255,0.02) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,0.02) 1px,transparent 1px),
+    #080b12;
+  background-size:auto,24px 24px,24px 24px;
+  display:none;
+}
+#screen-game.active{display:block;}
+.game-wrap{max-width:820px;margin:0 auto;padding:26px 20px 60px;}
+.game-panel{
+  background:#0d1017;border:4px solid #d8d8d8;
+  box-shadow:0 0 0 4px #000,0 0 0 8px #3c3f47,0 0 0 9px #000,inset 0 0 0 2px #000,0 10px 30px rgba(0,0,0,0.7);
+  padding:22px;image-rendering:pixelated;
+}
+.game-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding-bottom:14px;border-bottom:3px solid #000;margin-bottom:18px;}
+.game-labname{font-size:16px;font-weight:700;letter-spacing:2px;text-shadow:2px 2px 0 #000;}
+.game-progress{font-size:13px;color:#aab;background:#000;padding:6px 10px;border:2px solid #3c3f47;}
+.hpbox{display:flex;align-items:center;gap:10px;background:#000;border:2px solid #3c3f47;padding:6px 10px;}
+.hpbox .ps{color:#fff;}
+.hpbox-bar{display:flex;gap:2px;}
+.hpbox-seg{width:8px;height:12px;background:#1c1e26;}
+.hpbox-seg.on{background:var(--green);}
+.hpbox-seg.on.mid{background:var(--yellow);}
+.hpbox-seg.on.low{background:var(--red);}
+.hpbox-num{font-size:13px;color:#fff;}
+
+.dialog-box{
+  background:#0a0c14;border:3px solid #d8d8d8;box-shadow:inset 0 0 0 3px #000;
+  padding:20px 18px;min-height:150px;margin-bottom:18px;position:relative;
+}
+.dialog-speaker{font-size:12px;color:var(--cyan);letter-spacing:2px;margin-bottom:10px;}
+.dialog-text{font-size:15px;line-height:2.05;color:#e6e6e6;min-height:2em;white-space:pre-wrap;}
+.dialog-hint{
+  position:absolute;right:12px;bottom:8px;font-size:11px;color:#556;
+  animation:blink 1.4s steps(1) infinite;
+}
+.options{display:flex;flex-direction:column;gap:12px;}
+.opt-btn{
+  display:block;width:100%;text-align:left;background:#10131d;color:#e6e6e6;
+  border:3px solid #4a4f5e;box-shadow:inset 0 0 0 2px #000,3px 3px 0 #000;
+  padding:13px 14px;font-size:14px;line-height:1.7;transition:all .1s;
+}
+.opt-btn:hover{border-color:#fff;background:#1a1f2e;transform:translate(-1px,-1px);box-shadow:inset 0 0 0 2px #000,4px 4px 0 #000;}
+.opt-btn:active{transform:translate(2px,2px);box-shadow:inset 0 0 0 2px #000,1px 1px 0 #000;}
+.opt-key{
+  display:inline-block;background:#000;border:2px solid #7a7f8e;color:#fff;
+  padding:2px 8px;margin-right:10px;font-weight:700;font-size:13px;
+}
+.opt-btn.chosen{border-color:var(--cc,#fff);}
+.opt-btn.disabled{opacity:.45;pointer-events:none;}
+
+.outcome-box{
+  border:3px solid var(--green);background:#08110c;
+  box-shadow:inset 0 0 0 2px #000,3px 3px 0 #000;
+  padding:16px 14px;margin-bottom:14px;animation:shakeIn .35s ease;
+}
+.outcome-box.dead{border-color:var(--red);background:#150808;}
+.outcome-box.panic{border-color:var(--yellow);background:#141106;}
+.outcome-tag{font-size:12px;letter-spacing:2px;color:var(--green);margin-bottom:8px;}
+.outcome-box.dead .outcome-tag{color:var(--red);}
+.outcome-box.panic .outcome-tag{color:var(--yellow);}
+.outcome-text{font-size:14px;line-height:2;color:#f0f0f0;}
+@keyframes shakeIn{
+  0%{transform:translateX(0);}
+  20%{transform:translateX(-6px);}
+  40%{transform:translateX(6px);}
+  60%{transform:translateX(-4px);}
+  80%{transform:translateX(4px);}
+  100%{transform:translateX(0);}
+}
+.rule-box{
+  border:3px dashed var(--cyan);background:#070d14;
+  box-shadow:inset 0 0 0 2px #000;
+  padding:14px;margin-bottom:16px;
+}
+.rule-tag{font-size:12px;letter-spacing:2px;color:var(--cyan);margin-bottom:8px;}
+.rule-box.dead .rule-tag{color:var(--red);}
+.rule-text{font-size:14px;line-height:1.9;color:#cfe8f5;}
+.hp-change{font-size:13px;margin-bottom:14px;letter-spacing:1px;}
+.hp-change.minus{color:var(--red);}
+.hp-change.plus{color:var(--green);}
+.btn-next{
+  background:var(--yellow);color:#000;border:none;font-weight:700;letter-spacing:2px;
+  font-size:14px;padding:12px 26px;border:3px solid #000;box-shadow:3px 3px 0 #000,inset 0 0 0 2px rgba(255,255,255,0.25);
+}
+.btn-next:hover{background:#ffe14d;}
+.btn-next:active{transform:translate(2px,2px);box-shadow:1px 1px 0 #000;}
+.btn-back{
+  background:transparent;color:var(--dim);border:2px solid #3c3f47;font-size:12px;
+  padding:7px 12px;letter-spacing:1px;
+}
+.btn-back:hover{color:#fff;border-color:#fff;}
+
+/* 结算 / 死亡 / 结局屏 */
+#screen-labdone,#screen-gameover,#screen-ending{
+  display:none;align-items:center;justify-content:center;
+  background:radial-gradient(circle at 50% 40%,rgba(74,222,128,0.06),transparent 60%),#080b12;
+}
+#screen-labdone.active,#screen-gameover.active,#screen-ending.active{display:flex;}
+.center-panel{
+  width:min(680px,92vw);border:4px solid #d8d8d8;background:#0d1017;
+  box-shadow:0 0 0 4px #000,0 0 0 8px #3c3f47,0 0 0 9px #000,inset 0 0 0 2px #000,0 10px 30px rgba(0,0,0,0.7);
+  padding:34px 30px;text-align:center;image-rendering:pixelated;
+}
+.center-title{font-size:22px;font-weight:700;letter-spacing:3px;margin-bottom:18px;text-shadow:3px 3px 0 #000;}
+.center-title.good{color:var(--green);}
+.center-title.bad{color:var(--red);}
+.center-title.gold{color:var(--yellow);}
+.stat-row{display:flex;justify-content:center;gap:26px;flex-wrap:wrap;margin:16px 0 22px;}
+.stat-item{font-size:13px;color:#aab;line-height:2;}
+.stat-item b{font-size:18px;color:#fff;}
+.stat-item b.ok{color:var(--green);}
+.stat-item b.panic{color:var(--yellow);}
+.stat-item b.dead{color:var(--red);}
+.badge-line{font-size:15px;color:var(--yellow);letter-spacing:2px;margin:10px 0;line-height:2;}
+.death-list{margin:14px auto 20px;max-width:480px;text-align:left;}
+.death-list li{font-size:13px;color:#e8b3b3;line-height:2;border-bottom:1px dashed #2a2a2e;list-style:none;}
+.death-list li::before{content:"✝ ";color:var(--red);}
+.center-btns{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:8px;}
+.btn-big{
+  background:var(--yellow);color:#000;border:none;font-weight:700;letter-spacing:2px;
+  font-size:14px;padding:13px 28px;border:3px solid #000;box-shadow:3px 3px 0 #000;
+}
+.btn-big:hover{background:#ffe14d;}
+.btn-big:active{transform:translate(2px,2px);box-shadow:1px 1px 0 #000;}
+.btn-big.red{background:var(--red);color:#fff;}
+.btn-big.red:hover{background:#ff5c5c;}
+
+/* 死亡红闪 */
+.death-flash{
+  position:fixed;inset:0;background:rgba(255,20,20,0.5);z-index:950;pointer-events:none;
+  animation:deathFlash .7s ease forwards;
+}
+@keyframes deathFlash{
+  0%{opacity:0;} 15%{opacity:1;} 100%{opacity:0;}
+}
+.death-title{
+  position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);z-index:951;pointer-events:none;
+  font-size:clamp(34px,8vw,72px);font-weight:700;color:var(--red);letter-spacing:8px;
+  text-shadow:4px 4px 0 #000,0 0 30px rgba(255,51,51,0.8);
+  animation:deathZoom 1.1s ease forwards;
+}
+@keyframes deathZoom{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(.4);}
+  30%{opacity:1;transform:translate(-50%,-50%) scale(1.15);}
+  100%{opacity:0;transform:translate(-50%,-50%) scale(1);}
+}
+
+/* 结局像素彩带 */
+.confetti-piece{
+  position:fixed;top:-14px;z-index:952;pointer-events:none;
+  width:8px;height:8px;animation:confettiFall linear forwards;
+}
+@keyframes confettiFall{
+  to{transform:translateY(110vh) rotate(720deg);opacity:.9;}
+}
+
+/* ============ 安全规范弹窗 ============ */
+.reg-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:900;
+  display:none;align-items:center;justify-content:center;padding:20px;
+}
+.reg-overlay.open{display:flex;}
+.reg-panel{
+  width:min(860px,96vw);max-height:88vh;overflow-y:auto;
+  background:#0c0d10;border:1px solid var(--yellow);
+  box-shadow:0 0 40px rgba(255,204,0,0.15);
+  padding:24px;position:relative;
+}
+.reg-close{
+  position:absolute;top:10px;right:12px;background:none;border:none;
+  color:var(--dim);font-size:22px;line-height:1;
+}
+.reg-close:hover{color:var(--red);}
+.reg-title{color:var(--yellow);font-size:16px;letter-spacing:3px;margin-bottom:18px;}
+.reg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;}
+.reg-card{
+  border:1px solid var(--border);background:#101116;padding:14px;min-height:150px;
+}
+.reg-card-head{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;margin-bottom:10px;letter-spacing:1px;}
+.reg-card ol{padding-left:18px;}
+.reg-card li{font-size:12px;color:#b9b9b9;line-height:1.9;}
+.reg-card.locked{filter:grayscale(1);opacity:.6;}
+.reg-card.locked .reg-card-head{color:var(--dim);}
+.reg-card.locked .lock-text{font-size:12px;color:var(--dim);line-height:1.9;}
+
+/* 解锁 toast */
+.toast{
+  position:fixed;left:50%;bottom:36px;transform:translateX(-50%);z-index:960;
+  background:#000;border:2px solid var(--red);color:var(--red);
+  padding:12px 22px;font-size:14px;letter-spacing:2px;
+  box-shadow:0 0 24px rgba(255,51,51,0.5);
+  animation:toastIn .4s ease;
+}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,16px);}to{opacity:1;transform:translate(-50%,0);}}
+</style>
+</head>
+<body>
+<div class="scanlines"></div>
+<div class="crt-vignette"></div>
+
+<!-- ============ 启动终端 ============ -->
+<div id="screen-boot" class="screen">
+  <div class="boot-box">
+    <div class="boot-line dim" id="boot-l1"></div>
+    <div class="boot-line dim" id="boot-l2"></div>
+    <div class="boot-line" id="boot-l3"></div>
+    <div class="boot-line" id="boot-l4"></div>
+    <div class="boot-prompt hidden" id="boot-form">
+      <label>&gt; 请输入你的学号/昵称（可选）:</label>
+      <input id="boot-input" class="boot-input" maxlength="12" autocomplete="off">
+      <button id="boot-btn" class="boot-btn">进入实验室</button>
+    </div>
+    <div class="boot-line"><span class="cursor" id="boot-cursor"></span></div>
+  </div>
+</div>
+
+<!-- ============ 首页 ============ -->
+<div id="screen-home" class="screen">
+  <div class="home-wrap">
+    <div class="home-top">
+      <div class="home-logo">[ <b>SBAIGC-LAB-SIM</b> ] 危险行为模拟终端 v1.0</div>
+      <div class="home-right">
+        <div class="hp-display">
+          <div class="hp-num" id="home-hp-num">HP 100/100</div>
+          <div class="hp-bar" id="home-hp-bar"></div>
+        </div>
+        <button class="btn-reg" id="btn-reg">☢ 安全规范</button>
+      </div>
+    </div>
+
+    <div class="title-area">
+      <div class="title-main"><span class="glitch" data-text='实验室"作死"模拟器'>实验室"作死"模拟器</span></div>
+      <div class="title-sub">AIGC 课程作业 · 请在专业人员陪同下作死<span class="blink">_</span></div>
+    </div>
+
+    <div class="steps">
+      <div class="step"><span class="step-icon">阅</span>情境阅读<span style="color:var(--dim)">· 真实还原实验室常见情景</span></div>
+      <div class="step"><span class="step-icon">择</span>做出抉择<span style="color:var(--dim)">· 你的无知可能导致爆炸</span></div>
+      <div class="step"><span class="step-icon">判</span>迎接审判<span style="color:var(--dim)">· 专属死法 &amp; 生存指南</span></div>
+    </div>
+
+    <div class="cards" id="cards"></div>
+
+    <div class="home-bottom">
+      <div class="board-box">
+        <div class="box-title">☠ 达尔文奖排行榜</div>
+        <ul class="board-list" id="board-list"></ul>
+      </div>
+      <div class="disclaimer-box">
+        <p>本模拟器为 <b>AIGC 课程作业</b>，所有"死法"均为虚构剧情与黑色幽默。</p>
+        <p>真实实验请严格遵守安全规范，<b style="color:var(--red)">珍爱生命，拒绝作死</b>。</p>
+        <button class="btn-clear" id="btn-clear">清除存档（重置生命值）</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 二级场景 ============ -->
+<div id="screen-game" class="screen">
+  <div class="game-wrap">
+    <div class="game-panel">
+      <div class="game-top">
+        <div class="game-labname" id="game-labname">通用实验室</div>
+        <div class="game-progress" id="game-progress">场景 1/5</div>
+        <div class="hpbox">
+          <span class="ps">HP</span>
+          <div class="hpbox-bar" id="game-hp-bar"></div>
+          <span class="hpbox-num" id="game-hp-num">100</span>
+        </div>
+      </div>
+      <div class="dialog-box" id="dialog-box">
+        <div class="dialog-speaker" id="dialog-speaker">▶ 旁白</div>
+        <div class="dialog-text" id="dialog-text"></div>
+        <div class="dialog-hint" id="dialog-hint">点击跳过 ▸</div>
+      </div>
+      <div id="game-body"></div>
+      <div style="margin-top:18px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+        <button class="btn-back" id="btn-quit">◀ 放弃挣扎（返回主菜单）</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 实验室结算 ============ -->
+<div id="screen-labdone" class="screen">
+  <div class="center-panel">
+    <div class="center-title good" id="labdone-title">实验室通关！</div>
+    <div class="stat-row" id="labdone-stats"></div>
+    <div class="badge-line" id="labdone-badge"></div>
+    <div class="center-btns">
+      <button class="btn-big" id="btn-labdone-next">继续作死 ▸</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 游戏结束 ============ -->
+<div id="screen-gameover" class="screen">
+  <div class="center-panel">
+    <div class="center-title bad">GAME OVER · 你死了</div>
+    <div style="color:#aab;font-size:13px;letter-spacing:2px;margin-bottom:10px;">本局死法回顾</div>
+    <ul class="death-list" id="gameover-deaths"></ul>
+    <div style="color:var(--dim);font-size:12px;line-height:2;">你的英勇事迹已载入达尔文奖排行榜</div>
+    <div class="center-btns" style="margin-top:20px;">
+      <button class="btn-big" id="btn-rebirth">转世重修 ▸</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 全通关结局 ============ -->
+<div id="screen-ending" class="screen">
+  <div class="center-panel">
+    <div class="center-title gold">五张安全徽章集齐！</div>
+    <div style="font-size:15px;color:#e6e6e6;line-height:2.2;">
+      恭喜你从「作死大师」毕业，<br>进化成为 <b style="color:var(--yellow);">实验室安全の神</b>。<br>
+      达尔文奖委员会遗憾宣布：<br>你已失去提名资格（暂时）。
+    </div>
+    <div class="center-btns" style="margin-top:24px;">
+      <button class="btn-big" id="btn-ending-home">回到主菜单 ▸</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 安全规范弹窗 ============ -->
+<div class="reg-overlay" id="reg-overlay">
+  <div class="reg-panel">
+    <button class="reg-close" id="reg-close">✕</button>
+    <div class="reg-title">☢ 已解锁的安全规范</div>
+    <div class="reg-grid" id="reg-grid"></div>
+  </div>
+</div>
+
+<script>
+/* ================= 数据 ================= */
+const LABS = [
+  {
+    id:'general', name:'通用实验室', cc:'#FFCC00', icon:'通',
+    desc:'熬夜赶工、烘箱过夜、电镜起火……最常见的死法集中营。',
+    scenarios:[
+      {
+        title:'深夜泡面计划',
+        n:'晚上十点半，你正在工位上熬夜赶毕设数据。空调开得很足，你有点冷，而且特别渴，刚好桌底下有个 800W 的小电热杯，想烧点热水泡个面。你看了下工位：墙上只有一个插座，上面已经插了一个普通的插线板，接了电脑、显示器、台灯和手机充电器。电热杯的插头没地方插了。',
+        opts:[
+          {txt:'你看了看那个插线板，仔细计算了一下各用电器的功率，得出结论不会过载。于是拔下手机充电器，把电热杯直接插在了这个插线板上。',tone:'ok',out:['功率算得明明白白，热水咕嘟咕嘟冒泡。泡面下肚，插线板不烫手。今夜，平安。'],rule:'使用大功率电器前先核算线路总功率；插线板总负载不得超过其额定值。'},
+          {txt:'你摸了摸插线板的线，觉得有点细，怕烧了。于是你从柜子里翻出一个工业级的大功率粗线插线板，把它插在墙插上，然后再把之前的插线板插在这个工业插线板上。',tone:'dead',tag:'插线板套娃叠三层',out:['插线板套娃正式启动！接触电阻层层叠加，深夜的工位炸开一朵美丽的电火花，你的毕设数据与泡面同归于尽。','三个插线板叠罗汉，电流还没走到电热杯，插头已经烤成了焦糖色。今晚的泡面，附赠烧烤味插座一个。'],rule:'严禁插线板串联使用；大功率电器应使用独立墙面插座并有人看管。'},
+          {txt:'你是个软蛋，担心电器违规，放弃了美味的泡面。',tone:'panic',out:['你饿着肚子熬到凌晨两点，泡面的香气在梦里对你反复处刑。人没事，胃有事。'],rule:'违规电器不要带进实验室；实在要喝热水，请去饮水机。'}
+        ]
+      },
+      {
+        title:'烘箱与快递纸箱',
+        n:'晚上 22:40，距离宿舍关门还有 20 分钟。你的烘箱设定在 200℃，里面是明天一早必须看到结果的样品，还需要再烤 2 个小时。你困得眼皮打架，而且如果不马上走，今晚就得睡实验室地板了。烘箱旁边，堆着一摞昨天刚拆的快递纸箱和牛皮纸包装。',
+        opts:[
+          {txt:'安全起见，你把烘箱的门留了三指宽的缝散热，把旁边的纸箱抱到另一个角落，然后离开。',tone:'ok',out:['纸箱挪走，散热留缝。烘箱安静地烘着样品，你安心地回到了宿舍。明早的数据，香。'],rule:'高温设备周围 0.5 米内严禁堆放纸箱等易燃物；散热空间保持通畅。'},
+          {txt:'你觉得人走太危险了，用了一个智能插座，设定了 2 小时后手机远程断电。你躺在宿舍床上，一直盯着手机。',tone:'panic',out:['你在床上盯手机盯到凌晨两点，插座准时断电。可你忘了那摞快递纸箱还挨着烘箱——它们和余温相谈甚欢，差点把实验室聊成壁炉。巡逻保安破门而入时，你还在纠结要不要再吃个夜宵。'],rule:'加热设备运行期间应有人值守或定时巡查；远程断电不等于远程看火。'},
+          {txt:'你决定利用快递纸箱和牛皮纸袋铺一张床，实验台旁边凑合一宿。',tone:'dead',tag:'在200℃烘箱旁睡纸箱床',out:['凌晨三点，烘箱一声闷响，火苗顺着你的快递纸箱床一路蔓延。你以「人体火场逃生」的姿势冲出实验室，毕设样品与你共焚。'],rule:'严禁在加热设备旁过夜；实验室不是宿舍，纸箱不是床。'}
+        ]
+      },
+      {
+        title:'八十万在冒烟',
+        n:'你正在使用价值 80 万的电子显微镜。机器内部突然发出「噼啪」声，紧接着冒出一股刺鼻的黑烟和明火。火势不大，局限在仪器的机箱缝隙里。你旁边两米处的墙上，挂着一个二氧化碳灭火器。走廊尽头的消防栓旁有红色的 ABC 干粉灭火器，但要跑过去拿。',
+        opts:[
+          {txt:'看到冒烟，你脑子里只有「赶紧灭火」。你砸下实验室的总闸，一把扯下墙上的二氧化碳灭火器，拔掉保险销，对着仪器内部缝隙就是一阵狂喷。',tone:'ok',out:['断电、拔销、压把、对准根部扫射，教科书级灭火。火灭了，电镜保住了，你今晚的奶茶也保住了。'],rule:'电器起火先断电，再用二氧化碳灭火器扑救；严禁用水或泡沫。'},
+          {txt:'你决定先断电，怕火把总线路烧了。你冲过去，伸手去拔仪器背后的 220V 大插头。',tone:'dead',tag:'徒手拔起火电镜的220V插头',out:['你的手刚碰到插头，一股酥麻感直冲天灵盖——仪器的线已经烧焦漏电了。你以「全身抽搐」的舞姿，为电镜跳了一支告别舞。'],rule:'起火设备严禁徒手触碰插头或机身；先去总闸断电，再灭火。'},
+          {txt:'你转身冲出实验室，跑到走廊尽头踹开消防柜，拖着干粉灭火器跑回来。',tone:'panic',out:['干粉喷进机箱，火是灭了，80 万的设备也变成了 80 万颗螺丝。导师看你的眼神，像在看一个把灭火器当发胶喷的狠人。'],rule:'精密电子仪器起火应优先使用二氧化碳灭火器，就近取用器材，先断电。'}
+        ]
+      },
+      {
+        title:'眼睛里的酸',
+        n:'你在稀释盐酸时手滑了一下，几滴稀酸溅进了你的眼睛。瞬间，一阵剧烈的刺痛袭来，你的眼泪狂飙，下意识地死死闭上了双眼。你凭着记忆去摸索洗眼器。',
+        opts:[
+          {txt:'你紧闭双眼，让水流冲在眼皮外面。刺痛感慢慢缓解了。冲了整整十五分钟，你觉得「不怎么疼了」，于是关上水阀，抹了把脸，去医务室拿眼药水。',tone:'dead',tag:'闭着眼冲洗溅酸的眼睛',out:['你闭着眼冲了十五分钟「眼皮浴」，酸液在结膜囊里开起了派对。等你在医务室睁开眼，眼前的世界自带马赛克滤镜。角膜：已老实，已放弃。'],rule:'化学灼伤眼睛必须掰开眼睑、持续睁眼冲洗至少 15 分钟，同时大声呼救。'},
+          {txt:'你选择固定式洗眼器，用双手死死扒开上下眼皮（甚至翻起眼睑），同时大喊以引起他人关注。',tone:'ok',out:['水流直冲结膜，十五分钟不间断。同学和老师全被你喊来了，酸液被冲得片甲不留。眼睛保住，社死值也拉满，值。'],rule:'眼部灼伤：用洗眼器持续睁眼冲洗 15 分钟以上，边冲边呼救，冲完立即就医。'},
+          {txt:'你选择使用抽拉式洗眼器。你一手死死拽着管子，一手试图去扒开自己紧闭的眼皮。水流压力，使你的眼睛变得更疼了。',tone:'panic',out:['你一手拽管一手扒眼，水流怼得你眼泪狂飙，眼皮反而闭得更紧。校医院医生边冲洗边摇头：孩子，你的眼睛不是保险箱，不用上双重锁。'],rule:'洗眼时保持睁眼、让水流充分冲洗眼球；疼痛加剧说明方法不对，及时求助他人。'}
+        ]
+      },
+      {
+        title:'隔壁的抽搐声',
+        n:'你正在工位上做实验，突然听到「砰」的一声。你转头一看，隔壁桌的同学因为违规操作，双手死死粘在一个破损的 220V 插线板上，浑身抽搐，脸色惨白。总电闸在走廊尽头，跑过去关闸至少需要 15 秒，而且中间可能还要绕过几个障碍物。你的手边有一根不知道干不干净的拖把棍。',
+        opts:[
+          {txt:'你当即决定救人，直接冲上去一把抓住同学的肩膀，想把他拽开。',tone:'dead',tag:'徒手去拽触电的同学',out:['你抓住了同学的肩膀，下一秒，你们俩在实验室里表演了「双人触电蹦迪」。拖把棍就在手边，你偏要肉身接线。'],rule:'发现触电先断电再施救；严禁徒手接触触电者，人体是良导体。'},
+          {txt:'你拔腿就往走廊跑，用最快速度拉下总电闸。',tone:'ok',out:['15 秒狂奔，你拉下总闸，实验室陷入黑暗，同学从抽搐中瘫软下来。救护车到的时候，他还有力气吐槽你跑得不够快。'],rule:'触电急救第一步永远是切断电源（拉闸）；时间允许时这是最安全的做法。'},
+          {txt:'你抓起旁边那根拖把棍，挑去同学身上的电线。',tone:'panic',out:['拖把棍挑飞电线，火花四溅，同学得救了。但拖把棍昨天刚拖过地，湿漉漉的——你的手臂一阵发麻，差点加入抽搐豪华套餐。'],rule:'如无法快速断电，可用干燥的绝缘物挑开电线；潮湿的木棍可能导电。'}
+        ]
+      }
+    ]
+  },
+  {
+    id:'eelab', name:'电子电工实验室', cc:'#00E5FF', icon:'电',
+    desc:'220V 的热情，电容的深情，万用表的柔情。',
+    scenarios:[
+      {
+        title:'就接个探头而已',
+        n:'电路板调试中，示波器探头掉了。板子通着 220V，电源指示灯亮得刺眼。导师在群里催数据，你急着重新接上探头……',
+        opts:[
+          {txt:'你拔掉电源插头，确认电容余电放尽，再重新接好探头，最后通电测试。',tone:'ok',out:['断电—接线—通电，教科书三连。波形出来了，数据完美，你的手指头也还健在。'],rule:'检修电路必须先断电、验电；严禁带电操作。'},
+          {txt:'你想着「就接个探头而已」，直接上手去插。',tone:'dead',tag:'带电插拔220V电路',out:['手指碰到针脚的一瞬间，220V 送你一套免费的心律复苏体验。你倒下的姿势很安详，示波器上的波形成了你人生的心电图。'],rule:'带电插拔是触电事故的头号来源；再急也要先断电。'},
+          {txt:'你让同学帮你按住电源线「防止它乱动」，自己眯着眼去插探头。',tone:'panic',out:['同学按住的那根线是好的，你插的那根不是。火花一冒，漏保跳闸，你们俩的友谊在黑暗中也跳了一次闸。'],rule:'让旁人徒手按住带电线路，同样是危险操作。'}
+        ]
+      },
+      {
+        title:'450V 的惊喜',
+        n:'一个废弃的大电解电容躺在实验台上，引脚朝上，标签写着 450V / 470μF。你想把它拆下来留着玩……',
+        opts:[
+          {txt:'你先拿万用表测了引脚两端电压，发现还有 300 多伏，于是用放电电阻跨接放电，确认归零后才动手拆。',tone:'ok',out:['测压、放电、拆件，一气呵成。电容落袋，手指安康。'],rule:'大电容拆卸前必须确认已充分放电（用放电电阻并万用表确认）。'},
+          {txt:'你直接上手去拔它。',tone:'dead',tag:'徒手拔未放电的大电容',out:['450V 的电容用 300 伏的余电给你的手指来了个「电击疗法」。你被弹出半米远，电容滚到地上，发出胜利的咕噜声。'],rule:'断电后的大电容仍可能储存致命电荷，禁止直接触碰引脚。'},
+          {txt:'你看到引脚就抄起螺丝刀去短接放电，「砰」的一声火花炸开，你吓得把螺丝刀扔上了天花板。',tone:'panic',out:['火花四溅，螺丝刀落地时刀头缺了一块。你保住了一条命，但裤子上多了个洞。'],rule:'放电应使用专用放电电阻缓慢进行，严禁直接短路。'}
+        ]
+      },
+      {
+        title:'测个市电',
+        n:'你想确认实验室墙插是不是 220V。桌上有个万用表，表笔插在电阻档的插孔里，旋钮停在「蜂鸣」档。',
+        opts:[
+          {txt:'你把旋钮拨到交流电压档，表笔换到正确插孔，手捏表笔绝缘端，小心测量。',tone:'ok',out:['表显 220.3V，你测完收工。万用表：这个家没有我，不行。'],rule:'测市电必须用交流电压档、正确表笔插孔，手不得触碰金属部分。'},
+          {txt:'你懒得换档，直接拿电阻档的两根表笔怼进插座孔里。',tone:'dead',tag:'用电阻档测220V市电',out:['啪！万用表在你手里原地起飞，保险丝炸成烟花。你握着两根烧黑的表笔，第一次理解了什么叫「表生如戏」。'],rule:'用电阻档/蜂鸣档测市电，会造成表内短路炸毁。'},
+          {txt:'你忘了换插孔，表笔还插在电流档上，怼进去的瞬间……',tone:'panic',out:['电流档内阻趋近于零，插座瞬间馈出狂暴电流。漏保跳闸救了你一命，万用表的尸体被供进了实验室的安全警示柜。'],rule:'表笔插在电流插孔时，严禁并联测量电压。'}
+        ]
+      }
+    ]
+  },
+  {
+    id:'chem', name:'化学实验室', cc:'#4ade80', icon:'化',
+    desc:'酸入水，不是水入酸。欢迎来到毁容一条街。',
+    scenarios:[
+      {
+        title:'浓硫酸的清晨',
+        n:'周一早八，你揉了揉眼睛，站在无机化学实验室的通风橱前。导师让你把浓硫酸稀释一下。你看了看手里的烧杯，又看了看旁边的水杯……',
+        opts:[
+          {txt:'把浓硫酸沿烧杯壁缓慢倒入水中，并用玻璃棒不断搅拌。',tone:'ok',out:['你规范地完成了操作。导师向你投来赞赏的目光。恭喜你，保住了你的实验服和眉毛。'],rule:'稀释浓硫酸：必须将酸缓缓倒入水中并不断搅拌（酸入水），严禁水入酸。'},
+          {txt:'端起水杯，把水直接倒进浓硫酸里。',tone:'dead',tag:'把水倒进浓硫酸',out:['嘶啦！你亲手制造了一个微型火山。滚烫的酸液像烟花一样喷溅，你的实验服瞬间变成了破洞渔网。学长忠告：永远记住，酸入水，不是水入酸！','你倒得真准！烧杯瞬间沸腾，黑色的碳化物直接溅了你一脸。恭喜你，喜提校医院一日游。记住：水入酸，毁容。'],rule:'水入酸会导致酸液暴沸飞溅，造成严重灼伤。'},
+          {txt:'找旁边同学借个塑料杯来装。',tone:'panic',out:['你慌慌张张地找塑料杯，结果手一滑，硫酸溅到了实验台上，冒起一阵白烟。虽然没伤到人，但你的实验数据全毁了，准备重做吧。'],rule:'稀释浓硫酸必须用耐热玻璃容器，严禁使用普通塑料杯。'}
+        ]
+      },
+      {
+        title:'鼻子识药水',
+        n:'实验台上摆着一瓶标签模糊的无色液体，瓶盖已经被拧开。你想确认它是不是你要的乙醇，于是你……',
+        opts:[
+          {txt:'你把瓶口移到离鼻子约一掌远，用手在瓶口上方轻轻扇动，让少量气体飘向鼻子。',tone:'ok',out:['扇闻法，稳。是乙醇没错，你的鼻子和你的实验一样干净利落。'],rule:'闻试剂用「扇闻法」，严禁把鼻子凑到瓶口直接闻。'},
+          {txt:'你把鼻子凑到瓶口，深吸一口气。',tone:'dead',tag:'凑到瓶口深吸浓氨水',out:['一股直冲脑门的气味把你的灵魂从鼻孔里拽了出来——那是浓氨水。你以「后仰九十度」的姿势，向全班展示了什么叫气体冲击疗法。'],rule:'直接闻刺激性或未知试剂，可能导致呼吸道灼伤。'},
+          {txt:'你眯起一只眼，隔着一米远猛吸，还拿手电照了照瓶子。',tone:'panic',out:['隔着一米你闻了个寂寞，只好求助师兄。师兄幽幽地看了你一眼：那瓶是我配的稀盐酸。你的鼻子保住了，你的脸没了。'],rule:'不确定的试剂应查阅标签或询问管理员，不要自行闻味判断。'}
+        ]
+      },
+      {
+        title:'燃烧的酒精灯',
+        n:'实验要用酒精灯加热。你发现灯里的酒精快烧完了，但实验才进行到一半，火焰眼看就要灭。旁边放着一整桶酒精。',
+        opts:[
+          {txt:'你熄灭酒精灯，等灯体冷却后，用漏斗小心添加酒精，再重新点燃。',tone:'ok',out:['熄灭、冷却、加料、点火，标准四连。火焰乖乖烧着，你的数据顺利产出。'],rule:'添加酒精必须先熄灭酒精灯并等灯体冷却，用漏斗添加，严禁向燃着的灯内加酒精。'},
+          {txt:'图省事，你直接拧开灯帽，抄起酒精桶就往还在燃烧的灯里倒。',tone:'dead',tag:'往燃烧的酒精灯里倒酒精',out:['酒精蒸气一点就着，火焰顺着酒流一路烧进桶里。你怀里瞬间多了一颗「酒精桶牌」燃烧弹，整栋楼的烟雾报警器为你唱起了安魂曲。'],rule:'酒精蒸气遇明火会瞬间引燃，并回烧入桶。'},
+          {txt:'你慌了，随手拿个一次性纸杯装了酒精往里倒，结果手一抖洒了一桌。',tone:'panic',out:['酒精洒了一桌子，你吓得一抖，桌上的火焰「呼」地铺开。好在师兄一把把你拽开，用湿抹布盖了上去。实验台：焦了。你：没了半条命。'],rule:'酒精洒落后应立即用湿抹布覆盖灭火，并远离火源。'}
+        ]
+      }
+    ]
+  },
+  {
+    id:'bio', name:'生物实验室', cc:'#B388FF', icon:'生',
+    desc:'离心机未配平？它转起来能要你的命。',
+    scenarios:[
+      {
+        title:'离心机的怒火',
+        n:'你急着离完心去吃饭。离心机的转子有 12 个孔，你手头 7 管样品。你随手把 7 管插了进去，盖子一盖就按了启动。',
+        opts:[
+          {txt:'你按下停止，把样品按对称位置重新摆放：相对的两个孔同时有管，并加平衡水配平重量。',tone:'ok',out:['配平后离心机稳稳转起来，样品分得干干净净。食堂的饭还热着。'],rule:'离心前必须对称配平（成对放置、重量相等），严禁单边装载。'},
+          {txt:'你心想「差几管能怎样」，直接启动了离心机。',tone:'dead',tag:'不配平就启动离心机',out:['离心机越转越抖，最后一声巨响，转子从机舱里蹦了出来，像一颗炮弹擦着你的耳朵飞过，嵌进了对面的白板。你的样品：天女散花。'],rule:'未配平的离心机可能甩出转子，威力堪比炮弹。'},
+          {txt:'你随便插了几个空管「假装配平」，也不称重就启动了。',tone:'panic',out:['机器发出拖拉机般的轰鸣，你手忙脚乱按了急停。样品混成一团，离心管碎了三根，师兄看你的眼神像看一个管不住手的熊孩子。'],rule:'「假装配平」不算配平；配平需称重并对称放置。'}
+        ]
+      },
+      {
+        title:'嘴上一吸',
+        n:'培养液要转移到锥形瓶里。玻璃移液管和洗耳球都在桌上，但你左手扶着培养皿，右手够不着洗耳球。师兄上个月还吐槽过「有人用嘴吸过」。',
+        opts:[
+          {txt:'你把培养皿放下，腾出手来用洗耳球吸液，动作行云流水。',tone:'ok',out:['洗耳球一捏一放，液体精准转移。你的嘴和培养基都保持了纯洁的友谊。'],rule:'严禁用嘴吸取任何试剂或培养液，必须使用洗耳球或移液器。'},
+          {txt:'你懒得放手，直接用嘴对着移液管吸了一口。',tone:'dead',tag:'用嘴吸移液管品尝培养基',out:['液体「嗖」地涌进嘴里，你品尝到了大肠杆菌培养基的「醇厚口感」。当晚你成了校医院消化内科的传奇病例，医生护士排队来围观。'],rule:'口吸移液曾造成多起中毒与感染事故。'},
+          {txt:'你一只手抓着洗耳球猛挤，另一只手抖了一下，吸过头了。',tone:'panic',out:['液体冲进洗耳球里，你手忙脚乱地拆开清洗。培养基损失三分之一，你的实验服沾上了奇异的香气。'],rule:'使用洗耳球时控制力度，吸液勿超过移液管刻度线。'}
+        ]
+      },
+      {
+        title:'火焰与酒精',
+        n:'无菌操作在超净台里进行。酒精灯点着，旁边放着一瓶 95% 的酒精。你的手刚用酒精棉消过毒，还湿着。',
+        opts:[
+          {txt:'你等手上的酒精挥发干，再把酒精瓶挪到离火焰远的一侧，才伸手进台里操作。',tone:'ok',out:['手干了，瓶子远了，火焰老老实实。你的平板一个污染菌都没有，完美。'],rule:'使用酒精灯时易燃品必须远离火焰；酒精消毒后待挥发再靠近火源。'},
+          {txt:'你直接把手伸向酒精灯旁边的瓶子，沾满酒精的手越过火苗上方。',tone:'dead',tag:'湿手越过酒精灯火苗',out:['湿手刚过火焰上方，蓝色火苗「呼」地爬上你的手背。你获得了一双「火焰手套」，超净台外的人看到你在无声地蹦迪。'],rule:'沾有酒精的皮肤接触明火会瞬间燃烧。'},
+          {txt:'你情急之下把酒精瓶打翻，酒精流到了酒精灯脚下。',tone:'panic',out:['一道火线顺着桌面铺开，你抓起湿抹布一通乱盖。火灭了，你培养了两周的菌板也一起「火化」了。'],rule:'酒精起火用湿抹布覆盖窒息灭火，切勿用水冲。'}
+        ]
+      }
+    ]
+  },
+  {
+    id:'rad', name:'放射性实验室', cc:'#FF3333', icon:'辐', hidden:true,
+    desc:'看不见摸不着，照一照，半衰期变短。',
+    scenarios:[
+      {
+        title:'来不及的样品',
+        n:'现在你正处在 XRD（X 射线衍射）实验室内，你正急着测一个样品。导师刚发微信催问数据。操作面板在手边，你熟练地点了「出束」。警示灯亮了，但防护门并没有完全关严（留了一道几厘米的缝），门机联锁指示灯是暗的。你这才想起来，这门锁上周就报修了，还没修好。',
+        opts:[
+          {txt:'出束时，人要站在机房外。你依据过往经验，退到黄线以外，坚决不推门进去，等待数据。',tone:'ok',out:['你站在黄线外刷完了三次朋友圈。数据跑完，样品完好，人也完好。导师的催问微信？已读不回。'],rule:'射线装置出束期间，人员必须撤离至屏蔽区（黄线）外。'},
+          {txt:'你是一个怂包，按下急停按钮使实验室断电。接受导师与课题组成员的制裁和三份事故报备单的洗礼。',tone:'panic',out:['仪器死了，样品死了，你的课题进度也死了。导师在群里把你 @ 成了筛子，三份事故报备单在桌上摞成了你的遗照。社死，也是一种死。'],rule:'发现联锁失效应立即停机并报修，严禁带病运行。（急停保命，报备受刑，两难全。）'},
+          {txt:'调样品，不会耽误太多时间。为了安全起见，你扯了一件沉重的铅围裙套在身上，推门走进曝光室。',tone:'dead',tag:'出束时穿铅围裙进曝光室',out:['你套着铅围裙推门走进曝光室。可惜主束不是散射，铅围裙挡不住正面直射。第二天，你的细胞开始集体讨论「变异」的新企划案。'],rule:'出束期间严禁任何人进入曝光室；铅围裙只能防护散射，不能抵挡主束直射。'}
+        ]
+      },
+      {
+        title:'吧嗒一声',
+        n:'你正在做 P-32（磷-32）同位素标记实验。P-32 的半衰期只有 14 天。你戴着双层乳胶手套，左手拿着移液枪，全神贯注地盯着通风橱。一小滴高活度的放射性液体，吧嗒一声，滴在了不锈钢实验台面上。',
+        opts:[
+          {txt:'你取出 75% 的酒精，对着那一块台面来回猛擦。随后对酒精棉片进行了安全处理。',tone:'panic',out:['你擦得相当用力，污染点被你均匀地涂抹成了直径三十厘米的「辐射披萨」。探测仪一响，半个台面都亮了。师兄：您这擦的不是台面，是寂寞。'],rule:'放射性污染严禁来回擦抹，会把点污染摊成面污染。'},
+          {txt:'你觉得不能来回擦拭，于是拿起洗瓶，用大量清水对着那块台面猛冲，把液体顺着台面边缘冲进水槽。',tone:'dead',tag:'用水把放射性液体冲进水槽',out:['水流带着放射性液体冲进水槽，进水的一瞬间，水槽变成了新的放射源。你成功把事故等级从「台面」升级成了「下水道系统」。'],rule:'放射性废液严禁冲入下水道；水冲会扩大污染范围。'},
+          {txt:'你拿起探测仪，扫描一遍，确认污染范围，然后用记号笔画出圈，用轻薄的吸水纸沾干。',tone:'ok',out:['先扫描、再标记、后沾干，流程堪称教科书。污染被牢牢圈在小圆里，台面恢复平静。'],rule:'放射性污染处理：先探测定位，再标记范围，用吸水纸从外向内沾干。'}
+        ]
+      },
+      {
+        title:'台面角落的宝藏',
+        n:'晚上十点半，你刚做完一天的放射性同位素实验，肚子已经饿得咕咕叫。你只想赶紧把台面擦干净走人。你拿抹布一抹，台面最里面的角落里，滚出来一个灰扑扑的、只有拇指大小的金属圆柱体。它没有任何标签，应该是上一组同学拆下来的什么废旧螺丝，或者是某种仪器的配重块。它静静地躺在你刚擦完的一堆废纸巾旁边。',
+        opts:[
+          {txt:'挑衅安全员师兄，请他来鉴宝。',tone:'panic',out:['师兄只看了一眼，脸色从铁青变成惨白：「那是放射源！」你俩对视三秒，实验室响起了此生最整齐的夺门而逃。'],rule:'疑似放射源应立即报告专业人员，不要自行处置。'},
+          {txt:'你用抹布把它扔进了黄色的放射性废品袋。',tone:'ok',out:['你隔着抹布把它扔进黄色废物袋，事后才知道自己刚和一颗工业放射源打了个照面。安全员师兄给你点了赞，并强烈建议你买张彩票。'],rule:'无标签疑似放射源应隔离至专用废物容器，并立即报告检测。'},
+          {txt:'你发现它沉甸甸的，适合做镇纸，用酒精仔细消毒了一遍，带出了实验室。',tone:'dead',tag:'把工业放射源带回宿舍当镇纸',out:['你把它擦得锃亮，摆在宿舍书桌上当镇纸。接下来的三周，你的头发学会了「离家出走」。原来那不是配重块，是一颗铱-192 工业放射源。'],rule:'放射源严禁带离实验室；无标签金属件可能比它看起来危险一万倍。'}
+        ]
+      }
+    ]
+  }
+];
+
+const REGS = {
+  general:['插线板严禁串联使用，大功率电器使用独立墙插','高温设备周围 0.5 米内不得堆放易燃物，运行期间尽量有人值守','电器起火先断电，再用二氧化碳灭火器扑救','化学灼伤眼睛：掰开眼睑持续冲洗至少 15 分钟并呼救','发现触电先断电，严禁徒手接触触电者'],
+  eelab:['检修电路必须先断电、验电','大电容拆卸前须确认充分放电','测市电用交流电压档，手捏绝缘端','严禁带电插拔接线','烙铁等发热工具用毕放回架并断电'],
+  chem:['稀释浓硫酸：酸入水，缓慢搅拌','闻试剂用扇闻法','酒精灯熄火冷却后再加酒精','强酸强碱操作佩戴护目镜','化学废液分类回收，严禁倒入下水道'],
+  bio:['离心前必须对称配平','严禁用嘴吸取任何液体','酒精等易燃品远离明火','生物废弃物高温灭菌处理','超净台操作前紫外消毒'],
+  rad:['出束期间人员撤离至屏蔽区外','联锁失效立即停机报修','放射性污染先探测、再标记、后沾干','疑似放射源隔离并报告，严禁带离','放射性废物投入专用黄色废物袋']
+};
+
+const FAKE_BOARD = [
+  '打翻水银温度计还不开窗通风的张三',
+  '把微波炉当烘干机烤球鞋的李四',
+  '徒手放电450V电容被弹飞两米的王五',
+  '在通风橱里点蚊香驱蚊的赵六',
+  '用嘴吸移液管品尝大肠杆菌的孙七',
+  '深夜给燃着的酒精灯续酒精的钱八',
+  '穿拖鞋上金工车床的周九'
+];
+
+const TONE_META = {
+  ok:{tag:'【完美通关】', cls:'', hpDelta:0},
+  dead:{tag:'【专属死法】', cls:'dead', hpDelta:-20},
+  panic:{tag:'【警告】', cls:'panic', hpDelta:-5}
+};
+
+/* ================= 状态 ================= */
+const SAVE_KEY = 'sbaigc_save_v1';
+let S = { name:'', hp:100, badges:[], deaths:[], board:[] };
+let G = null;   // 当前游戏：{lab, si, stats, lastOutcome}
+let bootDone = false;
+let revealRadDone = false;
+
+function loadSave(){
+  try{
+    const raw = localStorage.getItem(SAVE_KEY);
+    if(raw){ const d = JSON.parse(raw); S = Object.assign(S, d); }
+  }catch(e){}
+}
+function save(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }catch(e){} }
+function playerName(){ return S.name ? S.name : '某位匿名勇士'; }
+
+/* ================= 音频（WebAudio，无外部资源） ================= */
+let AC = null;
+function initAudio(){
+  if(!AC){
+    try{ AC = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){}
+  }
+  if(AC && AC.state === 'suspended'){ AC.resume(); }
+}
+document.addEventListener('pointerdown', initAudio, {once:true});
+document.addEventListener('keydown', initAudio, {once:true});
+
+function tone(freq, dur, type='square', vol=0.05, delay=0, slideTo=null){
+  if(!AC) return;
+  const t0 = AC.currentTime + delay;
+  const osc = AC.createOscillator();
+  const g = AC.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t0);
+  if(slideTo){ osc.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur); }
+  g.gain.setValueAtTime(vol, t0);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  osc.connect(g); g.connect(AC.destination);
+  osc.start(t0); osc.stop(t0 + dur + 0.02);
+}
+function sfxHover(){ tone(660,0.08,'square',0.035); tone(330,0.1,'square',0.035,0.08); }
+function sfxClick(){ tone(220,0.06,'square',0.04); }
+function sfxOk(){ tone(523,0.09,'square',0.05); tone(659,0.09,'square',0.05,0.09); tone(784,0.14,'square',0.05,0.18); }
+function sfxPanic(){ tone(400,0.12,'square',0.05,0,300); }
+function sfxDead(){ tone(800,0.5,'sawtooth',0.06,0,60); tone(120,0.6,'square',0.05,0.1,40); }
+function sfxUnlock(){ tone(523,0.1,'square',0.05); tone(659,0.1,'square',0.05,0.1); tone(784,0.1,'square',0.05,0.2); tone(1047,0.25,'square',0.05,0.3); }
+function sfxType(){ tone(1200,0.015,'square',0.012); }
+
+/* ================= 工具 ================= */
+const $ = s => document.querySelector(s);
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+  const el = document.getElementById(id);
+  el.classList.add('active');
+  window.scrollTo(0,0);
+}
+function el(tag, cls, html){
+  const e = document.createElement(tag);
+  if(cls) e.className = cls;
+  if(html !== undefined) e.innerHTML = html;
+  return e;
+}
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+/* 打字机 */
+function typeInto(node, text, speed, done){
+  let i = 0;
+  node.textContent = '';
+  node._skip = false;
+  const tick = () => {
+    if(node._skip){ node.textContent = text; if(done) done(); return; }
+    i += 1;
+    node.textContent = text.slice(0, i);
+    if(i < text.length){
+      if(text[i-1] && text[i-1] !== ' ' && text[i-1] !== '\n') sfxType();
+      setTimeout(tick, speed);
+    }else{
+      if(done) done();
+    }
+  };
+  tick();
+}
+
+/* ================= 启动终端 ================= */
+function boot(){
+  showScreen('screen-boot');
+  const l1 = $('#boot-l1'), l2 = $('#boot-l2'), l3 = $('#boot-l3'), l4 = $('#boot-l4');
+  const seq = [
+    [l1, '> SBAIGC-LAB-SIM v1.0 已连接'],
+    [l2, '> 正在初始化实验室安全系统... OK'],
+    [l3, '> 检测到新的作死志愿者'],
+    [l4, '> 请签署《免责声明》：本模拟器不承担任何真实作死的后果']
+  ];
+  let k = 0;
+  function next(){
+    if(k >= seq.length){
+      $('#boot-cursor').classList.add('hidden');
+      $('#boot-form').classList.remove('hidden');
+      $('#boot-input').focus();
+      return;
+    }
+    const [node, text] = seq[k++];
+    typeInto(node, text, 18, next);
+  }
+  next();
+}
+$('#boot-btn').addEventListener('click', () => {
+  S.name = $('#boot-input').value.trim();
+  S.hp = 100;
+  save();
+  sfxClick();
+  showScreen('screen-home');
+  renderHome();
+});
+$('#boot-input').addEventListener('keydown', e => {
+  if(e.key === 'Enter'){ $('#boot-btn').click(); }
+});
+
+/* ================= 首页渲染 ================= */
+function renderHpBar(container, clsPrefix){
+  container.innerHTML = '';
+  const segs = 10;
+  const on = Math.max(0, Math.ceil(S.hp / 100 * segs));
+  const lvl = S.hp > 50 ? '' : (S.hp > 25 ? 'mid' : 'low');
+  for(let i = 0; i < segs; i++){
+    const d = el('div', clsPrefix + '-seg' + (i < on ? ' on ' + lvl : ''));
+    container.appendChild(d);
+  }
+}
+function renderHp(){
+  const num = $('#home-hp-num');
+  num.textContent = 'HP ' + S.hp + '/100';
+  num.className = 'hp-num' + (S.hp > 50 ? '' : (S.hp > 25 ? ' mid' : ' low'));
+  renderHpBar($('#home-hp-bar'), 'hp');
+}
+
+function renderHome(){
+  renderHp();
+  const cards = $('#cards');
+  cards.innerHTML = '';
+  LABS.forEach(lab => {
+    const unlocked = !lab.hidden || (S.badges.indexOf('general')>=0 && S.badges.indexOf('eelab')>=0 && S.badges.indexOf('chem')>=0 && S.badges.indexOf('bio')>=0);
+    const done = S.badges.indexOf(lab.id) >= 0;
+    const card = el('div', 'lab-card');
+    card.setAttribute('data-cc', lab.cc);
+    if(lab.hidden && !unlocked){
+      card.classList.add('locked');
+      card.innerHTML = `
+        <div class="lab-card-head">
+          <span class="lab-icon" style="border-color:#555;color:#555;">?</span>
+          <span class="lab-name" style="color:#777;">？？？</span>
+        </div>
+        <div class="lock-note">隐藏实验室<br>通关前四个实验室后解锁<br><br>[ 信号被屏蔽 ]</div>`;
+    }else{
+      if(lab.hidden && !revealRadDone){ card.classList.add('reveal'); revealRadDone = true; }
+      card.innerHTML = `
+        ${done ? '<span class="lab-badge">✔ 已通关</span>' : ''}
+        <div class="lab-card-head">
+          <span class="lab-icon" style="border-color:${lab.cc};color:${lab.cc};">${lab.hidden?'☢':lab.icon}</span>
+          <span class="lab-name" style="color:${lab.cc};">${lab.name}</span>
+        </div>
+        <div class="lab-desc">${lab.desc}</div>
+        <div class="lock-note" style="margin-top:8px;">${lab.scenarios.length} 个情境 · 三种命运</div>
+        <button class="btn-enter" style="--cc:${lab.cc};">进入作死 ▸</button>`;
+      card.querySelector('.btn-enter').addEventListener('click', e => {
+        e.stopPropagation();
+        sfxClick();
+        startLab(lab.id);
+      });
+      card.addEventListener('mouseenter', sfxHover);
+    }
+    cards.appendChild(card);
+  });
+  renderBoard();
+  renderRegGrid();
+}
+
+function renderBoard(){
+  const ul = $('#board-list');
+  ul.innerHTML = '';
+  FAKE_BOARD.forEach((name, i) => {
+    ul.appendChild(el('li', '', `<span class="board-rank">第${i+1}名</span><span class="board-name">${name}</span>`));
+  });
+  S.board.forEach(name => {
+    ul.appendChild(el('li', 'new', `<span class="board-rank">新晋</span><span class="board-name">${name}</span>`));
+  });
+}
+
+/* ================= 安全规范弹窗 ================= */
+function renderRegGrid(){
+  const grid = $('#reg-grid');
+  grid.innerHTML = '';
+  const radUnlocked = S.badges.indexOf('general')>=0 && S.badges.indexOf('eelab')>=0 && S.badges.indexOf('chem')>=0 && S.badges.indexOf('bio')>=0;
+  LABS.forEach(lab => {
+    const card = el('div', 'reg-card');
+    if(lab.hidden){
+      if(radUnlocked){
+        card.innerHTML = `<div class="reg-card-head" style="color:${lab.cc};">☢ ${lab.name}</div><ol>${REGS[lab.id].map(r=>`<li>${r}</li>`).join('')}</ol>`;
+      }else{
+        card.classList.add('locked');
+        card.innerHTML = `<div class="reg-card-head">??? 隐藏实验室</div><div class="lock-text">待玩家通关前四个实验室后显示<br>（传闻与放射性有关…）</div>`;
+      }
+    }else{
+      const done = S.badges.indexOf(lab.id) >= 0;
+      card.innerHTML = `<div class="reg-card-head" style="color:${lab.cc};">${lab.icon} ${lab.name}${done?' ✔':''}</div><ol>${REGS[lab.id].map(r=>`<li>${r}</li>`).join('')}</ol>`;
+    }
+    grid.appendChild(card);
+  });
+}
+$('#btn-reg').addEventListener('click', () => {
+  renderRegGrid();
+  $('#reg-overlay').classList.add('open');
+  sfxClick();
+});
+$('#reg-close').addEventListener('click', () => $('#reg-overlay').classList.remove('open'));
+$('#reg-overlay').addEventListener('click', e => {
+  if(e.target === e.currentTarget){ $('#reg-overlay').classList.remove('open'); }
+});
+
+/* 清除存档 */
+$('#btn-clear').addEventListener('click', () => {
+  if(confirm('确定要清除存档吗？生命值将重置为 100。')){
+    localStorage.removeItem(SAVE_KEY);
+    location.reload();
+  }
+});
+
+/* ================= 游戏流程 ================= */
+function startLab(labId){
+  if(S.hp <= 0){
+    gameOver();
+    return;
+  }
+  const lab = LABS.find(l => l.id === labId);
+  G = { lab, si: 0, stats:{ ok:0, panic:0, dead:0 }, last:null };
+  showScreen('screen-game');
+  renderScenario();
+}
+
+function renderScenario(){
+  const sc = G.lab.scenarios[G.si];
+  $('#game-labname').textContent = G.lab.name;
+  $('#game-labname').style.color = G.lab.cc;
+  $('#game-progress').textContent = `场景 ${G.si+1}/${G.lab.scenarios.length}`;
+  renderGameHp();
+  $('#dialog-speaker').textContent = '▶ 旁白';
+  $('#dialog-hint').classList.remove('hidden');
+  const body = $('#game-body');
+  body.innerHTML = '';
+  const dt = $('#dialog-text');
+  const box = $('#dialog-box');
+  let typed = false;
+  box.onclick = () => { if(!typed){ dt._skip = true; } };
+  typeInto(dt, sc.n, 22, () => {
+    typed = true;
+    $('#dialog-hint').classList.add('hidden');
+    box.onclick = null;
+    showOptions();
+  });
+}
+
+function showOptions(){
+  const sc = G.lab.scenarios[G.si];
+  const body = $('#game-body');
+  body.innerHTML = '';
+  const wrap = el('div', 'options');
+  const keys = ['A','B','C'];
+  sc.opts.forEach((opt, i) => {
+    const btn = el('button', 'opt-btn', `<span class="opt-key">${keys[i]}</span>${opt.txt}`);
+    btn.addEventListener('click', () => choose(i, btn));
+    wrap.appendChild(btn);
+  });
+  body.appendChild(wrap);
+}
+
+function choose(i, btn){
+  sfxClick();
+  const sc = G.lab.scenarios[G.si];
+  const opt = sc.opts[i];
+  const meta = TONE_META[opt.tone];
+  G.stats[opt.tone] = (G.stats[opt.tone] || 0) + 1;
+  // 高亮所选、禁用全部
+  document.querySelectorAll('.opt-btn').forEach(b => b.classList.add('disabled'));
+  btn.classList.add('chosen');
+  btn.style.borderColor = opt.tone==='dead' ? '#FF3333' : (opt.tone==='panic' ? '#FFCC00' : '#4ade80');
+  // HP
+  const hpBefore = S.hp;
+  S.hp = Math.max(0, S.hp + meta.hpDelta);
+  if(opt.tone === 'dead'){
+    S.deaths.push({ lab:G.lab.name, title:sc.title, tag:opt.tag });
+    S.board.push(opt.tag + '的' + playerName());
+    save();
+  }else{
+    save();
+  }
+  const hpDelta = S.hp - hpBefore;
+  // 音效
+  if(opt.tone==='dead') sfxDead(); else if(opt.tone==='panic') sfxPanic(); else sfxOk();
+  if(hpDelta < 0) sfxPanic();
+  // 展示结局
+  const body = $('#game-body');
+  body.innerHTML = '';
+  const outcome = el('div', 'outcome-box ' + meta.cls);
+  outcome.innerHTML = `<div class="outcome-tag">${meta.tag}</div><div class="outcome-text"></div>`;
+  body.appendChild(outcome);
+  typeInto(outcome.querySelector('.outcome-text'), pick(opt.out), 24, () => {
+    // 安全规范
+    const rule = el('div', 'rule-box' + (opt.tone==='dead' ? ' dead' : ''));
+    rule.innerHTML = `<div class="rule-tag">${opt.tone==='dead' ? '【安全规范 · 重考警告】' : '【安全规范】'}</div><div class="rule-text">${opt.rule}</div>`;
+    body.appendChild(rule);
+    // HP 变化
+    const hc = el('div', 'hp-change ' + (hpDelta < 0 ? 'minus' : 'plus'));
+    hc.textContent = hpDelta < 0 ? `生命值 ${hpDelta}` : '生命值 无损失';
+    body.appendChild(hc);
+    renderGameHp();
+    renderHp();
+    // 下一步
+    const nextBtn = el('button', 'btn-next', S.hp <= 0 ? '迎接审判 ▸' : (G.si + 1 < G.lab.scenarios.length ? '下一场景 ▸' : '查看结算 ▸'));
+    nextBtn.addEventListener('click', () => {
+      sfxClick();
+      if(S.hp <= 0){
+        if(opt.tone === 'dead'){ deathFlash(() => gameOver()); }
+        else { deathFlash(() => gameOver()); }
+      }else if(G.si + 1 < G.lab.scenarios.length){
+        G.si++;
+        renderScenario();
+      }else{
+        labDone();
+      }
+    });
+    body.appendChild(nextBtn);
+  });
+}
+
+function renderGameHp(){
+  $('#game-hp-num').textContent = S.hp;
+  const bar = $('#game-hp-bar');
+  bar.innerHTML = '';
+  const on = Math.max(0, Math.ceil(S.hp / 100 * 10));
+  const lvl = S.hp > 50 ? '' : (S.hp > 25 ? 'mid' : 'low');
+  for(let i = 0; i < 10; i++){
+    bar.appendChild(el('div', 'hpbox-seg' + (i < on ? ' on ' + lvl : '')));
+  }
+}
+
+/* 实验室结算 */
+function labDone(){
+  const lab = G.lab;
+  const firstClear = S.badges.indexOf(lab.id) < 0;
+  if(firstClear){
+    S.badges.push(lab.id);
+    save();
+  }
+  $('#labdone-title').textContent = firstClear ? `「${lab.name}」通关！` : `「${lab.name}」再次通关`;
+  $('#labdone-stats').innerHTML = `
+    <div class="stat-item">安全操作<br><b class="ok">${G.stats.ok||0}</b></div>
+    <div class="stat-item">慌乱瞬间<br><b class="panic">${G.stats.panic||0}</b></div>
+    <div class="stat-item">作死次数<br><b class="dead">${G.stats.dead||0}</b></div>
+    <div class="stat-item">剩余生命<br><b>${S.hp}</b></div>`;
+  const badgeText = firstClear
+    ? `✔ 获得安全徽章：${lab.name}（${S.badges.length}/5）`
+    : `已持有该徽章（${S.badges.length}/5）`;
+  $('#labdone-badge').textContent = badgeText;
+  if(firstClear) sfxOk();
+  // 检查隐藏实验室解锁
+  const radUnlocked = S.badges.indexOf('general')>=0 && S.badges.indexOf('eelab')>=0 && S.badges.indexOf('chem')>=0 && S.badges.indexOf('bio')>=0;
+  const radDone = S.badges.indexOf('rad') >= 0;
+  $('#btn-labdone-next').textContent = (radUnlocked && !radDone) ? '隐藏实验室已解锁！继续作死 ▸' : '继续作死 ▸';
+  showScreen('screen-labdone');
+  if(firstClear && lab.id === 'bio' && radUnlocked && !radDone){
+    setTimeout(() => { sfxUnlock(); toast('☢ 隐藏实验室已解锁：放射性实验室'); }, 400);
+  }
+}
+$('#btn-labdone-next').addEventListener('click', () => {
+  sfxClick();
+  if(S.badges.length >= 5 && G.lab.id === 'rad'){
+    ending();
+  }else{
+    showScreen('screen-home');
+    renderHome();
+  }
+});
+
+/* 死亡 */
+function deathFlash(done){
+  const f = el('div', 'death-flash');
+  const t = el('div', 'death-title', '你 死 了');
+  document.body.appendChild(f);
+  document.body.appendChild(t);
+  sfxDead();
+  setTimeout(() => { f.remove(); t.remove(); if(done) done(); }, 1200);
+}
+function gameOver(){
+  const list = $('#gameover-deaths');
+  list.innerHTML = '';
+  S.deaths.forEach(d => {
+    list.appendChild(el('li', '', `<b>${d.lab}</b> · ${d.title} —— ${d.tag}`));
+  });
+  showScreen('screen-gameover');
+}
+$('#btn-rebirth').addEventListener('click', () => {
+  sfxClick();
+  S.hp = 100;
+  save();
+  showScreen('screen-home');
+  renderHome();
+});
+
+/* 全通关结局 */
+function ending(){
+  for(let i = 0; i < 40; i++){
+    const p = el('span', 'confetti-piece');
+    const colors = ['#FFCC00','#FF3333','#00E5FF','#4ade80','#B388FF'];
+    p.style.left = Math.random()*100 + 'vw';
+    p.style.background = colors[i % colors.length];
+    p.style.animationDuration = (2 + Math.random()*3) + 's';
+    p.style.animationDelay = Math.random()*1.5 + 's';
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 6000);
+  }
+  sfxUnlock();
+  showScreen('screen-ending');
+}
+$('#btn-ending-home').addEventListener('click', () => {
+  sfxClick();
+  showScreen('screen-home');
+  renderHome();
+});
+
+/* 退出实验室 */
+$('#btn-quit').addEventListener('click', () => {
+  sfxClick();
+  showScreen('screen-home');
+  renderHome();
+});
+
+function toast(msg){
+  const t = el('div', 'toast', msg);
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+/* ================= 启动 ================= */
+loadSave();
+if(S.name || S.badges.length || S.hp !== 100 || S.deaths.length){
+  showScreen('screen-home');
+  renderHome();
+}else{
+  boot();
+}
+</script>
+</body>
+</html>
